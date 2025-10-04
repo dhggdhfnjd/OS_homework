@@ -1,94 +1,382 @@
 #include<iostream>
+#include<fstream>
 #include<vector>
-#include<cstdint>
-#include<unistd.h>
-#include<sys/ipc.h>
-#include<sys/shm.h>
-#include<sys/wait.h>
 #include<sys/time.h>
+#include<sys/wait.h>
+#include<unistd.h>
+#include<signal.h>
+#include<cstdio>
+#include<cstdlib>
+#include<cstring>
+#include<cstdint>
+#include<cmath>
+#include<cctype>
+#include<semaphore.h>
+#include<queue>
+#include<algorithm>
+#include<pthread.h>
 using namespace std;
-int main()
+int g_thread_sum = 1;
+struct job
 {
-    int dim,count=0;
-    cout<<"Input the matrix dimension:";
-    cin>>dim;
-    
-    
-    vector <vector<uint32_t> > A(dim,vector<uint32_t>()),B(dim,vector<uint32_t>());
-    for(int i=0;i<dim;i++)
+    int l,r,m;
+    string sort;
+};
+
+vector<int> A;
+vector<pair<int,int> > range(8),range_level1(4),range_level2(2);
+queue<job> job_queue,finish_job_queue;
+sem_t sem_job;
+pthread_mutex_t mutex_job_queue;
+
+// 函數宣告
+void add_merge_job_1();
+void add_merge_job_2();
+void add_merge_job_3();
+void bubble_sort(int l, int r) { 
+    for (int i = l; i < r - 1; ++i) 
     {
-        for(int j=0;j<dim;j++)
+        for (int j = l; j < r - 1; ++j) 
         {
-            A[i].push_back(count);
-            B[i].push_back(count);
-            count++;
+            if (A[j] > A[j + 1]) 
+            swap(A[j], A[j + 1]);
         }
     }
-    // for(int i=0;i<dim;i++)
-    // {
-    //     for(int j=0;j<dim;j++)
-    //     {
-    //         printf("%d ",A[i][j]);
-    //     }
-    //     printf("\n");
-    // }
-    
-    for(int j=1;j<=16;j++)
+}
+void merge_sort(int l, int r, int m)
+{
+    vector<int> tmp;
+    int i = l, j = m;
+    while(i < m && j < r)
     {
-        struct timeval start, end;
-        int shmid = shmget(IPC_PRIVATE, dim*dim* sizeof(uint32_t), IPC_CREAT | 0600);
-        uint32_t* C = (uint32_t*) shmat(shmid, NULL, 0);  
-        gettimeofday(&start, NULL);
-        int time=dim/j;
-        for(int i=1;i<=j;i++)
+        if(A[i] <= A[j])
         {
-            pid_t child=fork();
-            if(child==0)
+            tmp.push_back(A[i]);
+            i++;
+        }
+        else
+        {
+            tmp.push_back(A[j]);
+            j++;
+        }
+    }
+    while(i < m)
+    {
+        tmp.push_back(A[i]);
+        i++;
+    }
+    while(j < r)
+    {
+        tmp.push_back(A[j]);
+        j++;
+    }
+    for(int k = 0; k < tmp.size(); k++)
+    {
+        A[l + k] = tmp[k];
+    }
+}
+void *allwork(void* thread_id)
+{
+    while(1)
+    {
+    int id=*(int*)thread_id;
+    sem_wait(&sem_job);
+    pthread_mutex_lock(&mutex_job_queue);
+    if(job_queue.empty())
+    {
+        pthread_mutex_unlock(&mutex_job_queue);
+        continue;
+    }
+    
+    job current_job = job_queue.front();
+    job_queue.pop();
+    pthread_mutex_unlock(&mutex_job_queue);
+    if(current_job.l==-1 && current_job.r==-1)
+    {
+        break;
+    }
+    if(current_job.sort == "merge")
+    {
+        // pthread_mutex_lock(&mutex_job_queue);
+        merge_sort(current_job.l, current_job.r, current_job.m);
+        // pthread_mutex_unlock(&mutex_job_queue);
+    }
+    else
+    {
+        // pthread_mutex_lock(&mutex_job_queue);
+        bubble_sort(current_job.l, current_job.r);
+        // pthread_mutex_unlock(&mutex_job_queue);
+    }
+    
+    pthread_mutex_lock(&mutex_job_queue);
+    finish_job_queue.push(current_job);
+    pthread_mutex_unlock(&mutex_job_queue);
+    
+    add_merge_job_1();
+    add_merge_job_2();
+    add_merge_job_3();
+}
+    return NULL;
+}
+void add_merge_job_1()
+{
+    pthread_mutex_lock(&mutex_job_queue);
+    if(finish_job_queue.size()>=2 )
+    {
+        vector<job> temp_jobs;
+        while(!finish_job_queue.empty())
+        {
+            temp_jobs.push_back(finish_job_queue.front());
+            finish_job_queue.pop();
+        }
+        for(int i = 0; i < temp_jobs.size(); i++)
+        {
+            for(int j = i + 1; j < temp_jobs.size(); j++)
             {
-                uint32_t sum=0;
-                if(i==j)
+                if(temp_jobs[i].l > temp_jobs[j].l)
                 {
-                    for(int r=time*(i-1);r<dim;r++)
-                    {
-                        for(int s=0;s<dim;s++)
-                        {
-                            for(int k=0;k<dim;k++)
-                            {
-                                sum=sum+A[s][k]*B[k][r];
-                            }
-                            C[s*dim+r]=sum;
-                            sum=0;
-                        }
-                    }
+                    swap(temp_jobs[i], temp_jobs[j]);
                 }
-                else
-                for(int r=time*(i-1);r<time*i;r++)
+            }
+        }
+        int flag=0;
+        for(int k = 0; k < 4; k++)
+        {
+            for(int i = 0; i < temp_jobs.size()-1; i++)
+            {
+                if(temp_jobs[i].l==range_level1[k].first && temp_jobs[i+1].r==range_level1[k].second && temp_jobs[i].r==temp_jobs[i+1].l)
                 {
-                    for(int s=0;s<dim;s++)
-                    {
-                        for(int k=0;k<dim;k++)
-                        {
-                            sum=sum+A[s][k]*B[k][r];
-                        }
-                        C[s*dim+r]=sum;
-                        sum=0;
-                    }
+                    job merge_job;
+                    merge_job.l = temp_jobs[i].l;
+                    merge_job.m = temp_jobs[i].r;
+                    merge_job.r = temp_jobs[i+1].r;
+                    merge_job.sort = "merge";
+                    job_queue.push(merge_job);
+                    sem_post(&sem_job);
+                    // 移除已合併的任務
+                    temp_jobs.erase(temp_jobs.begin() + i, temp_jobs.begin() + i + 2);
+                    i--; 
+                    flag=1;
+                    break;
                 }
-                exit(0);
+                
+            }
+            if(flag==1)
+            {
+                break;
+            }
+        }
+        // 將剩餘的任務放回佇列
+        for(int k = 0; k < temp_jobs.size(); k++)
+        {
+            finish_job_queue.push(temp_jobs[k]);
+        }
+    }
+    pthread_mutex_unlock(&mutex_job_queue);
+}
+void add_merge_job_2()
+{
+    pthread_mutex_lock(&mutex_job_queue);
+    if(finish_job_queue.size()>=2 )
+    {
+        vector<job> temp_jobs;
+        while(!finish_job_queue.empty())
+        {
+            temp_jobs.push_back(finish_job_queue.front());
+            finish_job_queue.pop();
+        }
+        for(int i = 0; i < temp_jobs.size(); i++)
+        {
+            for(int j = i + 1; j < temp_jobs.size(); j++)
+            {
+                if(temp_jobs[i].l > temp_jobs[j].l)
+                {
+                    swap(temp_jobs[i], temp_jobs[j]);
+                }
+            }
+        }
+        int flag=0;
+        for(int k = 0; k < 2; k++)
+        {
+            for(int i = 0; i < temp_jobs.size()-1; i++)
+            {
+                if(temp_jobs[i].l==range_level2[k].first && temp_jobs[i+1].r==range_level2[k].second && temp_jobs[i].r==temp_jobs[i+1].l)
+                {
+                    job merge_job;
+                    merge_job.l = temp_jobs[i].l;
+                    merge_job.m = temp_jobs[i].r;
+                    merge_job.r = temp_jobs[i+1].r;
+                    merge_job.sort = "merge";
+                    job_queue.push(merge_job);
+                    sem_post(&sem_job);
+                    temp_jobs.erase(temp_jobs.begin() + i, temp_jobs.begin() + i + 2);
+                    i--; 
+                    flag=1;
+                    break;
+                }
+                
+            }
+            if(flag==1)
+            {
+                break;
+            }
+    }
+        // 將剩餘的任務放回佇列
+        for(int k = 0; k < temp_jobs.size(); k++)
+        {
+            finish_job_queue.push(temp_jobs[k]);
+        }
+        
+    }
+    pthread_mutex_unlock(&mutex_job_queue);
+}
+void add_merge_job_3()
+{
+    pthread_mutex_lock(&mutex_job_queue);
+    if(finish_job_queue.size()==2)
+    {
+        vector<job> temp_jobs;
+        while(!finish_job_queue.empty())
+        {
+            temp_jobs.push_back(finish_job_queue.front());
+            finish_job_queue.pop();
+        }
+        // 使用氣泡排序替代 lambda expression
+        for(int i = 0; i < temp_jobs.size(); i++)
+        {
+            for(int j = i + 1; j < temp_jobs.size(); j++)
+            {
+                if(temp_jobs[i].l > temp_jobs[j].l)
+                {
+                    swap(temp_jobs[i], temp_jobs[j]);
+                }
+            }
+        }
+        // 檢查是否可以進行最終合併
+        if (temp_jobs.size() == 2 &&temp_jobs[0].l == 0 &&temp_jobs[1].r == (int)A.size() &&temp_jobs[0].r == temp_jobs[1].l)     
+        {
+            temp_jobs.pop_back();
+            temp_jobs.pop_back();
+            job merge_job;
+            merge_job.l = 0;
+            merge_job.m = temp_jobs[0].r;
+            merge_job.r = A.size();
+            merge_job.sort = "merge";
+            job_queue.push(merge_job);
+            sem_post(&sem_job);
+            
+            
+            for(int i = 0; i < g_thread_sum; i++)
+            {
+            job end_job;
+            end_job.l = -1;
+            end_job.r = -1;
+            end_job.sort = "end";
+            job_queue.push(end_job);
+            sem_post(&sem_job);
             }
         }
        
-        for(int i=0;i<j;i++)
-        wait(NULL); 
-        gettimeofday(&end, NULL);
-        double sec = (end.tv_sec-start.tv_sec)+(double)(end.tv_usec-start.tv_usec)/1000000;
-        uint32_t checksum=0;
-        for (int idx=0;idx<dim*dim;++idx) 
-        checksum+=C[idx];
-        cout<<"Multiplying matrices using "<<j<<" processes"<<endl;
-        cout<<"Elapsed time="<<sec<<"sec,";
-        cout<<"Checksum="<<checksum<<"\n";
-        shmdt(C);
-        shmctl(shmid, IPC_RMID, NULL);
+        else 
+        {
+            // 將任務放回佇列
+            for(int k = 0; k < temp_jobs.size(); k++)
+            {
+                finish_job_queue.push(temp_jobs[k]);
+            }
+        }
+        
+        }
+    pthread_mutex_unlock(&mutex_job_queue);
+}
+void add_bubble_job()
+{
+    for(int i=0;i<8;i++)
+    {
+        job p_job;
+        
+        p_job.l=range[i].first;
+        p_job.r=range[i].second;
+        p_job.sort="bubble";
+        pthread_mutex_lock(&mutex_job_queue);
+        job_queue.push(p_job);
+        pthread_mutex_unlock(&mutex_job_queue);
+        sem_post(&sem_job);
     }
+}
+int main()
+{
+    ofstream fout("output.txt");
+    sem_init(&sem_job,0,0);
+    pthread_mutex_init(&mutex_job_queue, NULL);
+    const int thread_sum=8;
+    pthread_t threads[thread_sum];
+    int thread_id[thread_sum];
+    int rc;
+    ifstream fin("input.txt");
+    int num; 
+    // 讀取所有數字直到檔案結束
+    while(fin >> num)
+    {
+        A.push_back(num);
+    }
+    fin.close();
+    for(int i=0;i<8;i++)
+    {
+        range[i].first=A.size()/8*i;
+        range[i].second=A.size()/8*(i+1);
+        if(i==7)
+        {
+            range[i].second=A.size();
+        }
+    }
+    for(int i=0;i<4;i++)
+    {
+        range_level1[i].first=A.size()/4*i;
+        range_level1[i].second=A.size()/4*(i+1);
+        if(i==3)
+        {
+            range_level1[i].second=A.size();
+        }
+    }
+    range_level2[0].first=range_level1[0].first;
+    range_level2[0].second=range_level1[1].second;
+    range_level2[1].first=range_level1[2].first;
+    range_level2[1].second=range_level1[3].second;
+    vector<int> A0 = A;
+    for (int thread_sum = 1; thread_sum <= 8; ++thread_sum) {
+        A = A0;
+        while (!job_queue.empty()) job_queue.pop();
+        while (!finish_job_queue.empty()) finish_job_queue.pop();
+        sem_destroy(&sem_job);
+        sem_init(&sem_job, 0, 0);
+        g_thread_sum = thread_sum;
+        add_bubble_job();
+        vector<pthread_t> threads(thread_sum);
+        vector<int> thread_id(thread_sum);
+        timeval start, t1;
+        gettimeofday(&start, nullptr);
+
+        for (int i = 0; i < thread_sum; i++) {
+            thread_id[i] = i;
+            pthread_create(&threads[i], NULL, allwork, (void*)&thread_id[i]);
+        }
+        for (int i = 0; i < thread_sum; i++) {
+            pthread_join(threads[i], NULL);
+        }
+
+        gettimeofday(&t1, nullptr);
+        double ms = (t1.tv_sec - start.tv_sec) * 1000.0 +
+                    (t1.tv_usec - start.tv_usec) / 1000.0;
+
+        cout << "worker thread#"<<g_thread_sum<<", "<< " elapsed= " << ms << " ms\n";
+        for (int i = 0; i < (int)A.size(); i++) {
+            fout << A[i];
+            if (i != (int)A.size() - 1) {
+                fout << " ";
+            }
+        }
+        fout << endl;
+    }    
+    fout.close();
 }
