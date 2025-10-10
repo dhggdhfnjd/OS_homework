@@ -29,6 +29,7 @@ queue<job> job_queue,finish_job_queue;
 sem_t sem_job;
 pthread_mutex_t mutex_job_queue;
 
+
 // 函數宣告
 void add_merge_job_1();
 void add_merge_job_2();
@@ -149,7 +150,6 @@ void add_merge_job_1()
                     merge_job.sort = "merge";
                     job_queue.push(merge_job);
                     sem_post(&sem_job);
-                    // 移除已合併的任務
                     temp_jobs.erase(temp_jobs.begin() + i, temp_jobs.begin() + i + 2);
                     i--; 
                     flag=1;
@@ -259,16 +259,14 @@ void add_merge_job_3()
             temp_jobs.pop_back();
             job_queue.push(merge_job);
             sem_post(&sem_job);
-            
-            
             for(int i = 0; i < g_thread_sum; i++)
             {
-            job end_job;
-            end_job.l = -1;
-            end_job.r = -1;
-            end_job.sort = "end";
-            job_queue.push(end_job);
-            sem_post(&sem_job);
+                job end_job;
+                end_job.l = -1;
+                end_job.r = -1;
+                end_job.sort = "end";
+                job_queue.push(end_job);
+                sem_post(&sem_job);
             }
         }
        
@@ -300,8 +298,8 @@ void add_bubble_job()
 }
 int main()
 {
-    ofstream fout("output.txt");
     sem_init(&sem_job,0,0);
+    
     pthread_mutex_init(&mutex_job_queue, NULL);
     const int thread_sum=8;
     pthread_t threads[thread_sum];
@@ -309,7 +307,8 @@ int main()
     int rc;
     ifstream fin("input.txt");
     int num; 
-    // 讀取所有數字直到檔案結束
+    string line;
+    getline(fin, line); 
     while(fin >> num)
     {
         A.push_back(num);
@@ -364,13 +363,15 @@ int main()
                     (t1.tv_usec - start.tv_usec) / 1000.0;
 
         cout << "worker thread#"<<g_thread_sum<<", "<< " elapsed= " << ms << " ms\n";
+        string filename = "output_" + to_string(thread_sum) + ".txt";
+        ofstream fout(filename);
         for (int i = 0; i < (int)A.size(); i++) {
             fout << A[i];
             if (i != (int)A.size() - 1) {
                 fout << " ";
             }
         }
-        fout << endl;
+        fout.close();
     }    
-    fout.close();
+   
 }
