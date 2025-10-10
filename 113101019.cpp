@@ -31,9 +31,6 @@ queue<job> job_queue,finish_job_queue;
 sem_t sem_job;
 
 pthread_mutex_t mutex_job_queue;
-
-
-// 函數宣告
 void add_merge_job_1();
 void add_merge_job_2();
 void add_merge_job_3();
@@ -167,7 +164,6 @@ void add_merge_job_1()
                 break;
             }
         }
-        // 將剩餘的任務放回佇列
         for(int k = 0; k < temp_jobs.size(); k++)
         {
             finish_job_queue.push(temp_jobs[k]);
@@ -222,7 +218,6 @@ void add_merge_job_2()
                 break;
             }
     }
-        // 將剩餘的任務放回佇列
         for(int k = 0; k < temp_jobs.size(); k++)
         {
             finish_job_queue.push(temp_jobs[k]);
@@ -367,7 +362,7 @@ int main()
                     (t1.tv_usec - start.tv_usec) / 1000.0;
 
         cout << fixed << setprecision(6);
-        cout << "worker thread#" << g_thread_sum << ", " << " elapsed= " << ms << " ms\n";
+        cout << "worker thread #" << g_thread_sum << ", " << "elapsed= " << ms << " ms\n";
         string filename = "output_" + to_string(thread_sum) + ".txt";
         ofstream fout(filename);
         for (int i = 0; i < (int)A.size(); i++) {
@@ -378,5 +373,4 @@ int main()
         }
         fout.close();
     }    
-   
 }
