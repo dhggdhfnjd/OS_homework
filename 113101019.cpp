@@ -365,7 +365,8 @@ int main()
         double ms = (t1.tv_sec - start.tv_sec) * 1000.0 +
                     (t1.tv_usec - start.tv_usec) / 1000.0;
 
-        cout << "worker thread#"<<g_thread_sum<<", "<< " elapsed= " << ms << " ms\n";
+        cout << fixed << setprecision(6);
+        cout << "worker thread#" << g_thread_sum << ", " << " elapsed= " << ms << " ms\n";
         string filename = "output_" + to_string(thread_sum) + ".txt";
         ofstream fout(filename);
         for (int i = 0; i < (int)A.size(); i++) {
