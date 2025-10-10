@@ -17,6 +17,7 @@
 #include<pthread.h>
 using namespace std;
 int g_thread_sum = 1;
+
 struct job
 {
     int l,r,m;
@@ -27,6 +28,7 @@ vector<int> A;
 vector<pair<int,int> > range(8),range_level1(4),range_level2(2);
 queue<job> job_queue,finish_job_queue;
 sem_t sem_job;
+
 pthread_mutex_t mutex_job_queue;
 
 
@@ -108,10 +110,11 @@ void *allwork(void* thread_id)
     pthread_mutex_lock(&mutex_job_queue);
     finish_job_queue.push(current_job);
     pthread_mutex_unlock(&mutex_job_queue);
-    
+
     add_merge_job_1();
     add_merge_job_2();
     add_merge_job_3();
+    
 }
     return NULL;
 }
@@ -153,6 +156,7 @@ void add_merge_job_1()
                     temp_jobs.erase(temp_jobs.begin() + i, temp_jobs.begin() + i + 2);
                     i--; 
                     flag=1;
+                    
                     break;
                 }
                 
@@ -299,7 +303,6 @@ void add_bubble_job()
 int main()
 {
     sem_init(&sem_job,0,0);
-    
     pthread_mutex_init(&mutex_job_queue, NULL);
     const int thread_sum=8;
     pthread_t threads[thread_sum];
