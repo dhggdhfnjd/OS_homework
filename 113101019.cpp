@@ -237,7 +237,6 @@ void add_merge_job_3()
             temp_jobs.push_back(finish_job_queue.front());
             finish_job_queue.pop();
         }
-        // 使用氣泡排序替代 lambda expression
         for(int i = 0; i < temp_jobs.size(); i++)
         {
             for(int j = i + 1; j < temp_jobs.size(); j++)
@@ -248,16 +247,16 @@ void add_merge_job_3()
                 }
             }
         }
-        // 檢查是否可以進行最終合併
         if (temp_jobs.size() == 2 &&temp_jobs[0].l == 0 &&temp_jobs[1].r == (int)A.size() &&temp_jobs[0].r == temp_jobs[1].l)     
         {
-            temp_jobs.pop_back();
-            temp_jobs.pop_back();
+            
             job merge_job;
             merge_job.l = 0;
             merge_job.m = temp_jobs[0].r;
             merge_job.r = A.size();
             merge_job.sort = "merge";
+            temp_jobs.pop_back();
+            temp_jobs.pop_back();
             job_queue.push(merge_job);
             sem_post(&sem_job);
             
@@ -275,7 +274,6 @@ void add_merge_job_3()
        
         else 
         {
-            // 將任務放回佇列
             for(int k = 0; k < temp_jobs.size(); k++)
             {
                 finish_job_queue.push(temp_jobs[k]);
