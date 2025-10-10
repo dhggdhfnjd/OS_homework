@@ -97,15 +97,11 @@ void *allwork(void* thread_id)
     }
     if(current_job.sort == "merge")
     {
-        // pthread_mutex_lock(&mutex_job_queue);
         merge_sort(current_job.l, current_job.r, current_job.m);
-        // pthread_mutex_unlock(&mutex_job_queue);
     }
     else
     {
-        // pthread_mutex_lock(&mutex_job_queue);
         bubble_sort(current_job.l, current_job.r);
-        // pthread_mutex_unlock(&mutex_job_queue);
     }
     
     pthread_mutex_lock(&mutex_job_queue);
