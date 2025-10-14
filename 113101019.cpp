@@ -15,7 +15,7 @@
 #include<queue>
 #include<algorithm>
 #include<pthread.h>
-#include <iomanip>
+#include<iomanip>
 using namespace std;
 int g_thread_sum = 1;
 
@@ -112,7 +112,6 @@ void *allwork(void* thread_id)
     add_merge_job_1();
     add_merge_job_2();
     add_merge_job_3();
-    
 }
     return NULL;
 }
